@@ -1,3 +1,4 @@
+import CtaSection from '@/components/cta'
 import FaqSection from '@/components/faq'
 import FeatureSection from '@/components/features'
 import HeroSection from '@/components/hero'
@@ -16,6 +17,7 @@ const Home = () => {
         <WorkingSection />
         <TestimonialSection />
         <FaqSection />
+        <CtaSection />
     </div>
   )
 }
