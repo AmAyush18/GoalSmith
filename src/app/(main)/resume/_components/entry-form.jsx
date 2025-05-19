@@ -1,4 +1,3 @@
-// app/resume/_components/entry-form.jsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -15,7 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { entrySchema } from "@/app/lib/schema";
+import { experienceSchema, educationSchema, projectSchema } from "@/app/lib/schema";
 import { Sparkles, PlusCircle, X, Pencil, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { improveWithAI } from "../../../../../actions/resume";
@@ -29,6 +28,51 @@ const formatDisplayDate = (dateString) => {
 
 export function EntryForm({ type, entries, onChange }) {
   const [isAdding, setIsAdding] = useState(false);
+  
+  // Select the appropriate schema based on entry type
+  const getSchemaForType = () => {
+    switch (type.toLowerCase()) {
+      case "Education":
+        return educationSchema;
+      case "Project":
+        return projectSchema;
+      case "Experience":
+      default:
+        return experienceSchema;
+    }
+  };
+
+  // Get default values based on entry type
+  const getDefaultValues = () => {
+    const commonFields = {
+      title: "",
+      organization: "",
+      startDate: "",
+      endDate: "",
+      description: "",
+      current: false,
+    };
+
+    switch (type.toLowerCase()) {
+      case "education":
+        return {
+          ...commonFields,
+          organization: "", // School/University
+          degree: "",
+          gpa: "",
+        };
+      case "project":
+        return {
+          ...commonFields,
+          organization: "", // Optional for projects
+          projectUrl: "",
+          technologies: "",
+        };
+      case "experience":
+      default:
+        return commonFields;
+    }
+  };
 
   const {
     register,
@@ -38,24 +82,44 @@ export function EntryForm({ type, entries, onChange }) {
     watch,
     setValue,
   } = useForm({
-    resolver: zodResolver(entrySchema),
-    defaultValues: {
-      title: "",
-      organization: "",
-      startDate: "",
-      endDate: "",
-      description: "",
-      current: false,
-    },
+    resolver: zodResolver(getSchemaForType()),
+    defaultValues: getDefaultValues(),
   });
 
   const current = watch("current");
+
+  // Function to get the appropriate field labels based on type
+  const getFieldLabels = () => {
+    switch (type.toLowerCase()) {
+      case "education":
+        return {
+          title: "Degree/Certification",
+          organization: "School/University",
+          secondaryLabel: "GPA/Grade",
+        };
+      case "project":
+        return {
+          title: "Project Name",
+          organization: "Client/Organization (Optional)",
+          secondaryLabel: "Technologies Used",
+        };
+      case "experience":
+      default:
+        return {
+          title: "Title/Position",
+          organization: "Company/Organization",
+          secondaryLabel: "",
+        };
+    }
+  };
+
+  const fieldLabels = getFieldLabels();
 
   const handleAdd = handleValidation((data) => {
     const formattedEntry = {
       ...data,
       startDate: formatDisplayDate(data.startDate),
-      endDate: data.current ? "" : formatDisplayDate(data.endDate),
+      endDate: data.current ? "Present" : formatDisplayDate(data.endDate),
     };
 
     onChange([...entries, formattedEntry]);
@@ -76,7 +140,6 @@ export function EntryForm({ type, entries, onChange }) {
     error: improveError,
   } = useFetch(improveWithAI);
 
-  // Add this effect to handle the improvement result
   useEffect(() => {
     if (improvedContent && !isImproving) {
       setValue("description", improvedContent);
@@ -87,7 +150,6 @@ export function EntryForm({ type, entries, onChange }) {
     }
   }, [improvedContent, improveError, isImproving, setValue]);
 
-  // Replace handleImproveDescription with this
   const handleImproveDescription = async () => {
     const description = watch("description");
     if (!description) {
@@ -101,36 +163,116 @@ export function EntryForm({ type, entries, onChange }) {
     });
   };
 
+  // Render the display card for each entry
+  const renderEntryCard = (item, index) => {
+    // Common date display
+    const dateDisplay = item.current
+      ? `${item.startDate} - Present`
+      : `${item.startDate} - ${item.endDate}`;
+
+    // Custom content based on entry type
+    let secondaryInfo = null;
+    
+    switch (type.toLowerCase()) {
+      case "education":
+        secondaryInfo = item.gpa ? (
+          <p className="text-sm text-muted-foreground mt-1">GPA: {item.gpa}</p>
+        ) : null;
+        break;
+      case "project":
+        secondaryInfo = item.technologies ? (
+          <p className="text-sm text-muted-foreground mt-1">
+            Technologies: {item.technologies}
+          </p>
+        ) : null;
+        break;
+    }
+
+    // Render URL for projects if available
+    const projectUrl = type.toLowerCase() === "project" && item.projectUrl ? (
+      <p className="text-sm text-blue-500 hover:underline mt-1">
+        <a href={item.projectUrl} target="_blank" rel="noopener noreferrer">
+          {item.projectUrl}
+        </a>
+      </p>
+    ) : null;
+
+    return (
+      <Card key={index}>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">
+            {item.title}
+            {item.organization ? ` @ ${item.organization}` : ""}
+          </CardTitle>
+          <Button
+            variant="outline"
+            size="icon"
+            type="button"
+            onClick={() => handleDelete(index)}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">{dateDisplay}</p>
+          {secondaryInfo}
+          {projectUrl}
+          <p className="mt-2 text-sm whitespace-pre-wrap">{item.description}</p>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  // Render additional fields based on entry type
+  const renderAdditionalFields = () => {
+    switch (type.toLowerCase()) {
+      case "education":
+        return (
+          <div className="space-y-2">
+            <Input
+              placeholder="GPA/Grade (Optional)"
+              {...register("gpa")}
+              error={errors.gpa}
+            />
+            {errors.gpa && (
+              <p className="text-sm text-red-500">{errors.gpa.message}</p>
+            )}
+          </div>
+        );
+      case "project":
+        return (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Input
+                placeholder="Project URL (Optional)"
+                {...register("projectUrl")}
+                error={errors.projectUrl}
+              />
+              {errors.projectUrl && (
+                <p className="text-sm text-red-500">{errors.projectUrl.message}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Input
+                placeholder="Technologies Used (e.g., React, Node.js, MongoDB)"
+                {...register("technologies")}
+                error={errors.technologies}
+              />
+              {errors.technologies && (
+                <p className="text-sm text-red-500">{errors.technologies.message}</p>
+              )}
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="space-y-4">
-        {entries.map((item, index) => (
-          <Card key={index}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                {item.title} @ {item.organization}
-              </CardTitle>
-              <Button
-                variant="outline"
-                size="icon"
-                type="button"
-                onClick={() => handleDelete(index)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                {item.current
-                  ? `${item.startDate} - Present`
-                  : `${item.startDate} - ${item.endDate}`}
-              </p>
-              <p className="mt-2 text-sm whitespace-pre-wrap">
-                {item.description}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
+        {entries.map((item, index) => renderEntryCard(item, index))}
       </div>
 
       {isAdding && (
@@ -142,7 +284,7 @@ export function EntryForm({ type, entries, onChange }) {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Input
-                  placeholder="Title/Position"
+                  placeholder={fieldLabels.title}
                   {...register("title")}
                   error={errors.title}
                 />
@@ -152,7 +294,7 @@ export function EntryForm({ type, entries, onChange }) {
               </div>
               <div className="space-y-2">
                 <Input
-                  placeholder="Organization/Company"
+                  placeholder={fieldLabels.organization}
                   {...register("organization")}
                   error={errors.organization}
                 />
@@ -204,8 +346,17 @@ export function EntryForm({ type, entries, onChange }) {
                   }
                 }}
               />
-              <label htmlFor="current">Current {type}</label>
+              <label htmlFor="current">
+                {type.toLowerCase() === "experience" 
+                  ? "Current Position" 
+                  : type.toLowerCase() === "education" 
+                    ? "Currently Studying" 
+                    : "Ongoing Project"}
+              </label>
             </div>
+
+            {/* Additional fields based on entry type */}
+            {renderAdditionalFields()}
 
             <div className="space-y-2">
               <Textarea
