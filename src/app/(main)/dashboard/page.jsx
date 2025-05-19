@@ -10,6 +10,9 @@ const IndustryInsightsPage = async () => {
   if (!isOnboarded) {
     redirect("/onboarding")
   }
+
+  const insights = await getIndustryInsights();
+
   return (
     <div className="container mx-auto">
       <DashboardView insights={insights} />
